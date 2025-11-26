@@ -17,8 +17,18 @@ const CAMPUSES = [
 export function ProfileForm({ profile }: ProfileFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
+  const [avatarUrl, setAvatarUrl] = useState(profile?.avatar_url || null);
   const [isUploading, setIsUploading] = useState(false);
+
+  if (!profile) {
+    return (
+      <div className="bg-white dark:bg-zinc-900 shadow rounded-lg p-6 max-w-2xl mx-auto">
+        <p className="text-center text-gray-600 dark:text-gray-400">
+          Profil non trouvé. Veuillez rafraîchir la page.
+        </p>
+      </div>
+    );
+  }
 
   const handleUpdate = async (formData: FormData) => {
     setIsLoading(true);
@@ -109,8 +119,8 @@ export function ProfileForm({ profile }: ProfileFormProps) {
             disabled={isUploading}
           />
         </div>
-        <h2 className="mt-4 text-xl font-semibold">{profile.first_name} {profile.last_name}</h2>
-        <p className="text-gray-500 text-sm">{profile.email}</p>
+        <h2 className="mt-4 text-xl font-semibold">{profile.first_name || ""} {profile.last_name || ""}</h2>
+        <p className="text-gray-500 text-sm">{profile.email || ""}</p>
       </div>
 
       <form action={handleUpdate} className="space-y-6">
