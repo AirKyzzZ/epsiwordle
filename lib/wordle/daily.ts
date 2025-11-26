@@ -33,7 +33,7 @@ function loadDictionary(): string[] {
   }
 
   try {
-    const filePath = join(process.cwd(), "public", "dictionnary.dic");
+    const filePath = join(process.cwd(), "public", "dictionary.txt");
     
     if (!existsSync(filePath)) {
       console.error(`Dictionary file not found at: ${filePath}`);
@@ -43,45 +43,12 @@ function loadDictionary(): string[] {
     console.log(`Loading dictionary from: ${filePath}`);
     const startTime = Date.now();
     const fileContent = readFileSync(filePath, "utf-8");
-    const words: string[] = [];
-    const wordsSet = new Set<string>(); // Use Set for O(1) duplicate checking
-
-    // Parse the .dic file format
-    const lines = fileContent.split("\n");
     
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      
-      // Extract the first word (before comma if exists, otherwise before first dot)
-      let word = line.trim();
-      
-      // If there's a comma, take the part before it
-      if (word.includes(",")) {
-        word = word.split(",")[0].trim();
-      }
-      
-      // Remove everything after the first dot (tags)
-      if (word.includes(".")) {
-        word = word.split(".")[0].trim();
-      }
-      
-      // Remove any trailing spaces or special characters (keep only letters)
-      word = word.replace(/[^A-Za-zÀ-ÿ]/g, "").trim();
-      
-      if (!word || word.length < 2) continue;
-      
-      // Remove accents and convert to uppercase for comparison
-      const normalizedWord = word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-      
-      // Only add if it's a valid 5-letter word (letters only, no special chars after normalization)
-      if (/^[A-Z]+$/.test(normalizedWord) && normalizedWord.length === 5) {
-        // Use Set for O(1) duplicate checking instead of array.includes()
-        if (!wordsSet.has(normalizedWord)) {
-          wordsSet.add(normalizedWord);
-          words.push(normalizedWord);
-        }
-      }
-    }
+    // The file is already pre-processed: one 5-letter word per line
+    const words = fileContent
+      .split("\n")
+      .map(w => w.trim())
+      .filter(w => w.length === 5);
 
     dictionaryWords = words;
     global.__dictionaryCache = words; // Store in global cache

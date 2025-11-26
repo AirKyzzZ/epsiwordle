@@ -37,7 +37,7 @@ function loadDictionary(): Set<string> {
   }
 
   try {
-    const filePath = join(process.cwd(), "public", "dictionnary.dic");
+    const filePath = join(process.cwd(), "public", "dictionary.txt");
     
     if (!existsSync(filePath)) {
       dictionaryLoadError = `File not found at: ${filePath}`;
@@ -49,56 +49,24 @@ function loadDictionary(): Set<string> {
     console.log(`Loading dictionary from: ${filePath}`);
     const startTime = Date.now();
     const fileContent = readFileSync(filePath, "utf-8");
-    const words = new Set<string>();
-
-    // Parse the .dic file format
-    const lines = fileContent.split("\n");
-    let processedCount = 0;
     
-    for (const line of lines) {
-      if (!line.trim()) continue;
-      processedCount++;
-      
-      // Extract the first word (before comma if exists, otherwise before first dot)
-      let word = line.trim();
-      
-      // If there's a comma, take the part before it
-      if (word.includes(",")) {
-        word = word.split(",")[0].trim();
-      }
-      
-      // Remove everything after the first dot (tags)
-      if (word.includes(".")) {
-        word = word.split(".")[0].trim();
-      }
-      
-      // Remove any trailing spaces or special characters (keep only letters)
-      word = word.replace(/[^A-Za-zÀ-ÿ]/g, "").trim();
-      
-      if (!word || word.length < 2) continue;
-      
-      // Remove accents and convert to uppercase for comparison
-      const normalizedWord = word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
-      
-      // Only add if it's a valid 5-letter word (letters only, no special chars after normalization)
-      if (/^[A-Z]+$/.test(normalizedWord) && normalizedWord.length === 5) {
-        words.add(normalizedWord);
-      }
-    }
+    // The file is already pre-processed: one 5-letter word per line
+    // Create a Set for O(1) lookup
+    const words = new Set<string>(
+      fileContent
+        .split("\n")
+        .map(w => w.trim())
+        .filter(w => w.length === 5)
+    );
 
     dictionaryWords = words;
     global.__dictionaryCacheSet = words; // Store in global cache
     const loadTime = Date.now() - startTime;
-    console.log(`✓ Loaded ${words.size} words from dictionary in ${loadTime}ms (processed ${processedCount} lines)`);
+    console.log(`✓ Loaded ${words.size} words from dictionary in ${loadTime}ms`);
     
-    // Debug: check if "danse" is in the set
+    // Debug: check if "DANSE" is in the set (common test word)
     if (words.has("DANSE")) {
       console.log("✓ 'DANSE' found in dictionary");
-    } else {
-      console.log("✗ 'DANSE' NOT found in dictionary");
-      // Try to find similar words
-      const similar = Array.from(words).filter(w => w.startsWith("DANS")).slice(0, 5);
-      console.log("Similar words found:", similar);
     }
     
     return words;
@@ -154,7 +122,7 @@ export async function validateWord(word: string): Promise<boolean> {
     return true;
   }
   
-  // Also check if it's in our tech words list
+  // Also check if it's in our tech words list (if any)
   const supabase = await createClient();
   const { data: techWord } = await supabase
     .from("daily_words")
