@@ -36,10 +36,12 @@ export async function signup(formData: FormData) {
     return { error: "Veuillez utiliser votre adresse email EPSI (@ecoles-epsi.net)" };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "";
   const { error } = await supabase.auth.signUp({
     email,
     password,
     options: {
+      emailRedirectTo: `${siteUrl}/auth/callback`,
       data: {
         first_name: firstName,
         last_name: lastName,
@@ -62,10 +64,11 @@ export async function signInWithMagicLink(formData: FormData) {
     return { error: "Veuillez utiliser votre adresse email EPSI (@ecoles-epsi.net)" };
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "";
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
-      emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+      emailRedirectTo: `${siteUrl}/auth/callback`,
     },
   });
 
