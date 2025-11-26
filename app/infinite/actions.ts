@@ -60,44 +60,124 @@ function loadDictionary(): string[] {
 }
 
 async function getDefinitionFromAPI(word: string): Promise<string> {
-  try {
-    const response = await fetch(`https://fr.wiktionary.org/w/api.php?action=query&format=json&prop=extracts&titles=${encodeURIComponent(word)}&explaintext=1&redirects=1`, {
-      signal: AbortSignal.timeout(5000),
-      headers: { 'User-Agent': 'WordleFr/1.0 (education project)' }
-    });
-    
-    if (response.ok) {
+  // Try multiple word variations to find the definition
+  const wordVariations = [
+    word, // Original word (lowercase from dictionary)
+    word.charAt(0).toUpperCase() + word.slice(1), // Capitalized
+    word.toUpperCase(), // Uppercase
+  ];
+
+  for (const wordToTry of wordVariations) {
+    try {
+      const response = await fetch(
+        `https://fr.wiktionary.org/w/api.php?action=query&format=json&prop=extracts&titles=${encodeURIComponent(wordToTry)}&explaintext=1&redirects=1`,
+        {
+          signal: AbortSignal.timeout(8000),
+          headers: { 'User-Agent': 'WordleFr/1.0 (education project)' }
+        }
+      );
+      
+      if (!response.ok) continue;
+      
       const data = await response.json();
       const pages = data.query?.pages;
-      if (pages) {
-        const pageId = Object.keys(pages)[0];
-        if (pageId !== "-1") {
-          const extract = pages[pageId].extract;
-          if (extract) {
-            const frenchSection = extract.split("== Français ==")[1];
-            if (frenchSection) {
-              const lines = frenchSection.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
-              
-              for (let i = 0; i < lines.length; i++) {
-                const line = lines[i];
-                if (line.startsWith("=")) continue;
-                if (line.includes("\\") && (line.includes("masculin") || line.includes("féminin") || line.includes("verbe"))) continue;
-                if (line.startsWith("Étymologie")) continue;
-                
-                return line.replace(/^[0-9]+\.\s*/, "");
-              }
-            }
+      if (!pages) continue;
+      
+      const pageId = Object.keys(pages)[0];
+      if (pageId === "-1") continue; // Page not found
+      
+      const extract = pages[pageId].extract;
+      if (!extract || extract.trim().length === 0) continue;
+      
+      // Try to find French section
+      let frenchSection = extract.split("== Français ==")[1];
+      if (!frenchSection) {
+        // Try alternative French section headers
+        frenchSection = extract.split("==Français==")[1] || 
+                       extract.split("== FRANÇAIS ==")[1] ||
+                       extract; // Use whole extract as fallback
+      }
+      
+      if (frenchSection) {
+        // Split by newlines and process
+        const lines = frenchSection
+          .split("\n")
+          .map((l: string) => l.trim())
+          .filter((l: string) => l.length > 0 && l.length < 500); // Filter out very long lines
+        
+        for (const line of lines) {
+          // Skip headers
+          if (line.startsWith("=")) continue;
+          
+          // Skip pronunciation and metadata lines
+          if (line.includes("\\") || 
+              line.includes("{{") || 
+              line.includes("[[") ||
+              line.startsWith("Étymologie") ||
+              line.startsWith("Prononciation") ||
+              line.startsWith("Synonymes") ||
+              line.startsWith("Antonymes") ||
+              line.match(/^[A-ZÀ-ÖØ-ÞŒ]{1,3}$/)) {
+            continue;
+          }
+          
+          // Look for definition patterns
+          if (line.length >= 10) {
+            // Clean up the definition
+            let definition = line
+              .replace(/^[0-9]+[\.\)]\s*/, "") // Remove "1. " or "1) "
+              .replace(/^\([^)]+\)\s*/, "") // Remove parenthetical notes at start
+              .replace(/\s+/g, " ") // Normalize whitespace
+              .trim();
             
-            return extract.substring(0, 150).replace(/\n/g, " ") + "...";
+            // If it looks like a valid definition
+            if (definition.length >= 10 && 
+                !definition.match(/^(masculin|féminin|verbe|nom|adjectif|adverbe)$/i) &&
+                !definition.startsWith("Voir aussi") &&
+                !definition.startsWith("Références")) {
+              return definition.substring(0, 200); // Limit length
+            }
+          }
+        }
+        
+        // If no definition found in structured format, try to extract from first paragraph
+        const firstParagraph = frenchSection
+          .split("\n\n")[0]
+          .replace(/\n/g, " ")
+          .trim();
+        
+        if (firstParagraph.length >= 20 && firstParagraph.length < 300) {
+          // Clean up paragraph
+          let definition = firstParagraph
+            .replace(/^[A-ZÀ-ÖØ-ÞŒ]{1,5}\s+/, "") // Remove word at start
+            .replace(/\([^)]*\)/g, "") // Remove parenthetical notes
+            .replace(/\s+/g, " ")
+            .trim();
+          
+          if (definition.length >= 15) {
+            return definition.substring(0, 200);
           }
         }
       }
+      
+      // Last resort: return a cleaned excerpt from the extract
+      const cleaned = extract
+        .replace(/\n+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      
+      if (cleaned.length > 50) {
+        return cleaned.substring(0, 200) + (cleaned.length > 200 ? "..." : "");
+      }
+      
+    } catch (e) {
+      // Try next variation
+      continue;
     }
-  } catch (e) {
-    console.log("Could not fetch definition from API for:", word, e);
   }
   
-  return `Définition non trouvée pour : ${word}`;
+  // If all variations failed, return a generic message
+  return `Définition non disponible pour "${word}"`;
 }
 
 async function generateRandomWord(): Promise<{ word: string; definition: string }> {
