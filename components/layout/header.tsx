@@ -19,8 +19,8 @@ export function Header() {
       </div>
       
       <div className="flex w-1/3 justify-center">
-        <Link href="/game" className="text-2xl font-extrabold tracking-tight">
-          <span className="text-emerald-600">EPSI</span>WORDLE
+        <Link href="/game" className="flex items-center justify-center">
+          <img src="logo.png" alt="EPSIWORDLE" className="h-10 w-auto" />
         </Link>
       </div>
 

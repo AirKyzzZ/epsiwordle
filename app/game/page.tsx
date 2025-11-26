@@ -38,9 +38,6 @@ export default async function GamePage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <h1 className="text-4xl font-extrabold text-center mb-8 tracking-tight">
-        <span className="text-emerald-600">EPSI</span>WORDLE
-      </h1>
       
       <WordleGame 
         word={dailyWord.word} 

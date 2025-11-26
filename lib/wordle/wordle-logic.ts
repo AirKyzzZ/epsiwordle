@@ -1,12 +1,12 @@
 export type LetterStatus = "correct" | "present" | "absent" | "empty";
 
-export const WORD_LENGTH = 5;
 export const MAX_CHALLENGES = 6;
 
 export function getGuessStatuses(solution: string, guess: string): LetterStatus[] {
   const solutionChars = solution.split("");
   const guessChars = guess.split("");
-  const statuses: LetterStatus[] = Array(WORD_LENGTH).fill("absent");
+  const wordLength = solution.length;
+  const statuses: LetterStatus[] = Array(wordLength).fill("absent");
 
   // First pass: mark correct (green) letters
   guessChars.forEach((char, i) => {
@@ -33,4 +33,3 @@ export function getGuessStatuses(solution: string, guess: string): LetterStatus[
 export function isWinningGuess(statuses: LetterStatus[]) {
   return statuses.every((status) => status === "correct");
 }
-

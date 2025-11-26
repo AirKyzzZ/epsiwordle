@@ -1,35 +1,36 @@
 import clsx from "clsx";
 import { GameStatus, GuessResult } from "@/hooks/use-wordle";
-import { WORD_LENGTH, MAX_CHALLENGES, LetterStatus } from "@/lib/wordle/wordle-logic";
+import { MAX_CHALLENGES, LetterStatus } from "@/lib/wordle/wordle-logic";
 
 interface WordleBoardProps {
   guesses: GuessResult[];
   currentGuess: string;
   gameStatus: GameStatus;
   shakeRow: boolean;
+  wordLength: number;
 }
 
-export function WordleBoard({ guesses, currentGuess, gameStatus, shakeRow }: WordleBoardProps) {
+export function WordleBoard({ guesses, currentGuess, gameStatus, shakeRow, wordLength }: WordleBoardProps) {
   const empties = Array.from({ length: MAX_CHALLENGES - 1 - guesses.length }).fill("");
 
   return (
     <div className="mb-6 grid grid-rows-6 gap-2">
       {guesses.map((guess, i) => (
-        <CompletedRow key={i} guess={guess} />
+        <CompletedRow key={i} guess={guess} wordLength={wordLength} />
       ))}
       {guesses.length < MAX_CHALLENGES && (
-        <CurrentRow guess={currentGuess} shake={shakeRow} />
+        <CurrentRow guess={currentGuess} shake={shakeRow} wordLength={wordLength} />
       )}
       {empties.map((_, i) => (
-        <EmptyRow key={i} />
+        <EmptyRow key={i} wordLength={wordLength} />
       ))}
     </div>
   );
 }
 
-function CompletedRow({ guess }: { guess: GuessResult }) {
+function CompletedRow({ guess, wordLength }: { guess: GuessResult; wordLength: number }) {
   return (
-    <div className="grid grid-cols-5 gap-2">
+    <div className="flex gap-2 justify-center">
       {guess.word.split("").map((letter, i) => (
         <Cell key={i} letter={letter} status={guess.statuses[i]} />
       ))}
@@ -37,12 +38,12 @@ function CompletedRow({ guess }: { guess: GuessResult }) {
   );
 }
 
-function CurrentRow({ guess, shake }: { guess: string; shake: boolean }) {
+function CurrentRow({ guess, shake, wordLength }: { guess: string; shake: boolean; wordLength: number }) {
   const splitGuess = guess.split("");
-  const emptyCells = Array.from({ length: WORD_LENGTH - splitGuess.length }).fill("");
+  const emptyCells = Array.from({ length: wordLength - splitGuess.length }).fill("");
 
   return (
-    <div className={clsx("grid grid-cols-5 gap-2", shake && "animate-shake")}>
+    <div className={clsx("flex gap-2 justify-center", shake && "animate-shake")}>
       {splitGuess.map((letter, i) => (
         <Cell key={i} letter={letter} status="empty" isCompleted={false} />
       ))}
@@ -53,10 +54,10 @@ function CurrentRow({ guess, shake }: { guess: string; shake: boolean }) {
   );
 }
 
-function EmptyRow() {
+function EmptyRow({ wordLength }: { wordLength: number }) {
   return (
-    <div className="grid grid-cols-5 gap-2">
-      {Array.from({ length: WORD_LENGTH }).fill("").map((_, i) => (
+    <div className="flex gap-2 justify-center">
+      {Array.from({ length: wordLength }).fill("").map((_, i) => (
         <Cell key={i} />
       ))}
     </div>
@@ -96,4 +97,3 @@ function Cell({
     </div>
   );
 }
-

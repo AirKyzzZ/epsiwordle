@@ -4,7 +4,7 @@ import { useWordle, GameStatus, GuessResult } from "@/hooks/use-wordle";
 import { WordleBoard } from "@/components/wordle/wordle-board";
 import { WordleKeyboard } from "@/components/wordle/wordle-keyboard";
 import { useEffect, useState } from "react";
-import { saveGame } from "@/app/game/actions";
+import { saveGame, validateWord } from "@/app/game/actions";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,13 +24,41 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
     guesses,
     gameStatus,
     shakeRow,
+    errorMessage,
+    wordLength,
     onChar,
     onDelete,
     onEnter,
+    setErrorMessage,
   } = useWordle(word);
 
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(!!initialGameState);
+  const [isValidating, setIsValidating] = useState(false);
+
+  const handleEnter = async () => {
+    if (gameStatus !== "playing") return;
+    
+    if (currentGuess.length !== wordLength) {
+      onEnter(); // This triggers the length warning in hook
+      return;
+    }
+
+    setIsValidating(true);
+    try {
+      const isValid = await validateWord(currentGuess);
+      if (!isValid) {
+        setErrorMessage("Ce mot n'est pas dans notre dictionnaire");
+        // Need to manually trigger shake if possible or just show error
+        return;
+      }
+      onEnter();
+    } catch (e) {
+      console.error("Validation error", e);
+    } finally {
+      setIsValidating(false);
+    }
+  };
 
   useEffect(() => {
     if (gameStatus !== "playing" && !saved && !initialGameState) {
@@ -47,10 +75,6 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
     }
   }, [gameStatus, guesses, wordId, saved, initialGameState]);
 
-  // If we have initial state (already played), we should show that instead of a fresh game
-  // But useWordle starts fresh. We might need to adapt useWordle or just display the board in "read only" if already played.
-  // For simplicity here, if initialGameState is provided, we display it.
-
   if (initialGameState) {
     return (
       <div className="flex flex-col items-center">
@@ -58,7 +82,8 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
           guesses={initialGameState.guesses} 
           currentGuess="" 
           gameStatus={initialGameState.status} 
-          shakeRow={false} 
+          shakeRow={false}
+          wordLength={word.length}
         />
         <div className="mt-8 text-center">
           <h2 className="text-2xl font-bold mb-2">
@@ -84,18 +109,25 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
 
   return (
     <div className="flex flex-col items-center w-full max-w-lg mx-auto">
+      {errorMessage && (
+        <div className="mb-4 p-2 bg-red-100 text-red-700 rounded text-sm font-medium animate-in fade-in slide-in-from-top-2">
+          {errorMessage}
+        </div>
+      )}
+      
       <WordleBoard 
         guesses={guesses} 
         currentGuess={currentGuess} 
         gameStatus={gameStatus} 
-        shakeRow={shakeRow} 
+        shakeRow={shakeRow}
+        wordLength={wordLength}
       />
       
       {gameStatus === "playing" ? (
         <WordleKeyboard 
           onChar={onChar} 
           onDelete={onDelete} 
-          onEnter={onEnter} 
+          onEnter={handleEnter} 
           guesses={guesses} 
         />
       ) : (
@@ -127,7 +159,12 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
           )}
         </div>
       )}
+      
+      {isValidating && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+           <Loader2 className="h-8 w-8 animate-spin text-white" />
+        </div>
+      )}
     </div>
   );
 }
-
