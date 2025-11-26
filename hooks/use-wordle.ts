@@ -8,10 +8,15 @@ export type GuessResult = {
   statuses: LetterStatus[];
 };
 
-export function useWordle(solution: string) {
+interface UseWordleOptions {
+  initialGuesses?: GuessResult[];
+  initialStatus?: GameStatus;
+}
+
+export function useWordle(solution: string, options?: UseWordleOptions) {
   const [currentGuess, setCurrentGuess] = useState("");
-  const [guesses, setGuesses] = useState<GuessResult[]>([]);
-  const [gameStatus, setGameStatus] = useState<GameStatus>("playing");
+  const [guesses, setGuesses] = useState<GuessResult[]>(options?.initialGuesses || []);
+  const [gameStatus, setGameStatus] = useState<GameStatus>(options?.initialStatus || "playing");
   const [shakeRow, setShakeRow] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 

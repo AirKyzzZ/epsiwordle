@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { User, Settings, BarChart3 } from "lucide-react";
+import { User, Settings, BarChart3, Infinity } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 export function Header() {
@@ -33,6 +33,9 @@ export function Header() {
       </div>
 
       <div className="flex w-1/3 justify-end gap-4">
+        <Link href="/infinite" className="text-gray-500 hover:text-gray-900 dark:hover:text-gray-100" title="Mode Infini">
+          <Infinity size={24} />
+        </Link>
         <Link href="/stats" className="text-gray-500 hover:text-gray-900 dark:hover:text-gray-100">
           <BarChart3 size={24} />
         </Link>

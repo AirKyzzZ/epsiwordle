@@ -5,6 +5,7 @@ import { WordleBoard } from "@/components/wordle/wordle-board";
 import { WordleKeyboard } from "@/components/wordle/wordle-keyboard";
 import { useEffect, useState } from "react";
 import { saveGame, validateWord } from "@/app/game/actions";
+import { saveInfiniteGame } from "@/app/infinite/actions";
 import { Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -16,9 +17,12 @@ interface WordleGameProps {
     guesses: GuessResult[];
     status: GameStatus;
   } | null;
+  isInfinite?: boolean;
+  infiniteGameId?: string;
+  onGameComplete?: () => void;
 }
 
-export function WordleGame({ word, wordId, definition, initialGameState }: WordleGameProps) {
+export function WordleGame({ word, wordId, definition, initialGameState, isInfinite = false, infiniteGameId, onGameComplete }: WordleGameProps) {
   const {
     currentGuess,
     guesses,
@@ -30,7 +34,10 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
     onDelete,
     onEnter,
     triggerShake,
-  } = useWordle(word);
+  } = useWordle(word, {
+    initialGuesses: initialGameState?.guesses,
+    initialStatus: initialGameState?.status
+  });
 
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(!!initialGameState);
@@ -57,20 +64,43 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
     }
   };
 
+  // Save game when it's completed
   useEffect(() => {
     if (gameStatus !== "playing" && !saved && !initialGameState) {
       setIsSaving(true);
-      saveGame(wordId, guesses.length, guesses)
+      
+      const savePromise = isInfinite && infiniteGameId
+        ? saveInfiniteGame(infiniteGameId, guesses, gameStatus)
+        : saveGame(wordId, guesses.length, guesses);
+      
+      savePromise
         .then(() => {
           setSaved(true);
           setIsSaving(false);
+          if (onGameComplete) {
+            onGameComplete();
+          }
         })
         .catch((err) => {
           console.error("Failed to save game", err);
           setIsSaving(false);
         });
     }
-  }, [gameStatus, guesses, wordId, saved, initialGameState]);
+  }, [gameStatus, guesses, wordId, saved, initialGameState, isInfinite, infiniteGameId, onGameComplete]);
+
+  // For infinite mode, save progress incrementally (after each guess)
+  useEffect(() => {
+    if (isInfinite && infiniteGameId && guesses.length > 0 && gameStatus === "playing") {
+      // Debounce saves to avoid too many API calls
+      const timeoutId = setTimeout(() => {
+        saveInfiniteGame(infiniteGameId, guesses, gameStatus).catch((err) => {
+          console.error("Failed to save infinite game progress", err);
+        });
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [guesses, isInfinite, infiniteGameId, gameStatus]);
 
   if (initialGameState) {
     return (
@@ -93,12 +123,14 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
             <h3 className="font-semibold mb-1">Définition :</h3>
             <p>{definition}</p>
           </div>
-          <Link 
-            href="/stats"
-            className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-          >
-            Voir mes statistiques
-          </Link>
+          {!isInfinite && (
+            <Link 
+              href="/stats"
+              className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+            >
+              Voir mes statistiques
+            </Link>
+          )}
         </div>
       </div>
     );
@@ -140,14 +172,16 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
                  <p className="text-gray-700 dark:text-gray-300">{definition}</p>
                </div>
                
-               <div className="flex gap-4 justify-center">
-                  <Link 
-                    href="/stats"
-                    className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
-                  >
-                    Voir mes statistiques
-                  </Link>
-               </div>
+               {!isInfinite && (
+                 <div className="flex gap-4 justify-center">
+                    <Link 
+                      href="/stats"
+                      className="inline-flex items-center justify-center rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                    >
+                      Voir mes statistiques
+                    </Link>
+                 </div>
+               )}
              </div>
           )}
         </div>
