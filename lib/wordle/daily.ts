@@ -11,7 +11,6 @@ export interface DailyWord {
 }
 
 // Global cache for dictionary words (persists across module reloads in production)
-// Using a WeakMap-like pattern but with a simple global variable
 declare global {
   // eslint-disable-next-line no-var
   var __dictionaryCache: string[] | undefined;
@@ -44,7 +43,7 @@ function loadDictionary(): string[] {
     const startTime = Date.now();
     const fileContent = readFileSync(filePath, "utf-8");
     
-    // The file is already pre-processed: one 5-letter word per line
+    // The file is already pre-processed: one 5-letter word per line (accented)
     const words = fileContent
       .split("\n")
       .map(w => w.trim())
@@ -63,29 +62,65 @@ function loadDictionary(): string[] {
 
 async function getDefinitionFromAPI(word: string): Promise<string> {
   try {
-    const response = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/fr/${encodeURIComponent(word.toLowerCase())}`, {
-      signal: AbortSignal.timeout(3000),
-      headers: { 'Accept': 'application/json' }
+    // Use Wiktionary API which is much better for French
+    const response = await fetch(`https://fr.wiktionary.org/w/api.php?action=query&format=json&prop=extracts&titles=${encodeURIComponent(word)}&explaintext=1&redirects=1`, {
+      signal: AbortSignal.timeout(5000),
+      headers: { 'User-Agent': 'WordleFr/1.0 (education project)' }
     });
     
     if (response.ok) {
       const data = await response.json();
-      if (data && Array.isArray(data) && data.length > 0) {
-        const firstEntry = data[0];
-        if (firstEntry.meanings && firstEntry.meanings.length > 0) {
-          const firstMeaning = firstEntry.meanings[0];
-          if (firstMeaning.definitions && firstMeaning.definitions.length > 0) {
-            return firstMeaning.definitions[0].definition || `Mot français : ${word}`;
+      const pages = data.query?.pages;
+      if (pages) {
+        const pageId = Object.keys(pages)[0];
+        if (pageId !== "-1") {
+          const extract = pages[pageId].extract;
+          if (extract) {
+             // Parse the extract to find the first French definition
+             // Structure is usually:
+             // == Français ==
+             // ...
+             // === Nom commun === (or Verbe, Adjectif, etc.)
+             // word /pron/ ...
+             // 1. Definition...
+             
+             const frenchSection = extract.split("== Français ==")[1];
+             if (frenchSection) {
+               // Look for the first line that starts with a number, or just a clean paragraph
+               // Definitions often look like "1. (Sens) Description..." or just "Description..." after a type header
+               
+               // Split by newlines
+               const lines = frenchSection.split("\n").map((l: string) => l.trim()).filter((l: string) => l.length > 0);
+               
+               for (let i = 0; i < lines.length; i++) {
+                 const line = lines[i];
+                 // Skip headers (=== ... ===)
+                 if (line.startsWith("=")) continue;
+                 // Skip pronunciation lines (often contain backslashes or look like "mot \pron\" tags)
+                 if (line.includes("\\") && line.includes("masculin")) continue;
+                 if (line.includes("\\") && line.includes("féminin")) continue;
+                 if (line.includes("\\") && line.includes("verbe")) continue;
+                 if (line.startsWith("Étymologie")) continue;
+                 
+                 // If we found a definition (often starts with just text or a number)
+                 // Clean it up
+                 return line.replace(/^[0-9]+\.\s*/, ""); // Remove leading "1. "
+               }
+             }
+             
+             // Fallback: just return the first 150 chars of the extract if parsing fails
+             // but clean up newlines
+             return extract.substring(0, 150).replace(/\n/g, " ") + "...";
           }
         }
       }
     }
   } catch (e) {
-    console.log("Could not fetch definition from API for:", word);
+    console.log("Could not fetch definition from API for:", word, e);
   }
   
   // Fallback definition
-  return `Mot français : ${word}`;
+  return `Définition non trouvée pour : ${word}`;
 }
 
 async function generateDailyWord(): Promise<{ word: string; definition: string }> {
@@ -122,30 +157,40 @@ async function generateDailyWord(): Promise<{ word: string; definition: string }
   
   if (availableWords.length === 0) {
     console.warn("No more unused words in dictionary! All words have been used.");
-    // Reset: use all words again (or handle this case differently)
-    // For now, we'll use a random word from the full dictionary
+    // Reset: use all words again
     const randomIndex = Math.floor(Math.random() * dictionary.length);
     const selectedWord = dictionary[randomIndex];
+    // Get definition using the accented word
     const definition = await getDefinitionFromAPI(selectedWord);
-    return { word: selectedWord, definition };
+    
+    // When returning, we should probably return the NORMALIZED word for the game component
+    // BUT if we want to display the accent in the definition, we return it there.
+    // The game component expects a 5-letter word to match against guesses.
+    // Standard Wordle uses unaccented uppercase for the grid.
+    // So we return: word: "ABIME" (normalized), definition: "Abîme: ..."
+    // actually, let's return the normalized word for the 'word' field, but maybe keep the display word in definition?
+    
+    const normalizedWord = selectedWord.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    
+    // Prepend the display word to definition if needed, or just rely on the definition text
+    return { word: normalizedWord, definition: `(${selectedWord}) ${definition}` };
   }
   
-  // Pick a random word from available words
+  // Pick a random word
   const randomIndex = Math.floor(Math.random() * availableWords.length);
-  const selectedWord = availableWords[randomIndex];
+  const selectedWord = availableWords[randomIndex]; // e.g. "ABÎME"
   
-  // Get definition from API or use fallback
   const definition = await getDefinitionFromAPI(selectedWord);
+  const normalizedWord = selectedWord.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase(); // "ABIME"
   
-  console.log(`Selected random word: ${selectedWord} (${availableWords.length} words remaining)`);
+  console.log(`Selected random word: ${selectedWord} -> ${normalizedWord}`);
   
-  return { word: selectedWord, definition };
+  // Return normalized word for game logic, but definition includes context if needed
+  return { word: normalizedWord, definition: `(${selectedWord}) ${definition}` };
 }
 
 export async function getDailyWord(): Promise<DailyWord | null> {
   const supabase = await createClient();
-  // Use UTC date to ensure consistency across timezones
-  // Or use Europe/Paris timezone for French users
   const today = format(new Date(), "yyyy-MM-dd");
 
   // 1. Try to get existing word for today from DB
@@ -185,8 +230,7 @@ export async function getDailyWord(): Promise<DailyWord | null> {
         .single();
 
       if (insertError) {
-        // Handle race condition: if another request already inserted a word for today
-        // (unique constraint on 'date'), retry fetching it
+        // Handle race condition
         if (insertError.code === '23505' || insertError.message?.includes('duplicate') || insertError.message?.includes('unique')) {
           console.log("Word already exists for today (race condition), fetching it...");
           const { data: existingData } = await adminSupabase
@@ -198,7 +242,7 @@ export async function getDailyWord(): Promise<DailyWord | null> {
           if (existingData) {
             data = existingData;
           } else {
-            console.warn("Could not fetch word after race condition");
+             // Fallback
             return {
               id: "temp-id-" + Date.now(),
               word: newWordData.word,
@@ -208,7 +252,7 @@ export async function getDailyWord(): Promise<DailyWord | null> {
           }
         } else {
           console.warn("Could not save generated word to DB:", insertError.message);
-          return {
+           return {
               id: "temp-id-" + Date.now(),
               word: newWordData.word,
               definition: newWordData.definition,
@@ -220,7 +264,7 @@ export async function getDailyWord(): Promise<DailyWord | null> {
       }
     } catch (e: any) {
       console.error("Error generating/saving daily word:", e.message);
-      // Try one more time to fetch existing word (in case it was created by another request)
+       // Retry fetch
       const { data: retryData } = await supabase
         .from("daily_words")
         .select("*")
@@ -234,14 +278,12 @@ export async function getDailyWord(): Promise<DailyWord | null> {
       return {
         id: "fallback",
         word: "ERREUR",
-        definition: "Une erreur est survenue lors de la génération du mot.",
+        definition: "Une erreur est survenue.",
         date: today
       };
     }
   }
 
-  // Confirm: All users calling this function on the same date will get the same word
-  // The word changes at midnight (00:00) when the date changes
   return data as DailyWord;
 }
 

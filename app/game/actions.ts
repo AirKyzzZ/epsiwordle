@@ -50,24 +50,23 @@ function loadDictionary(): Set<string> {
     const startTime = Date.now();
     const fileContent = readFileSync(filePath, "utf-8");
     
-    // The file is already pre-processed: one 5-letter word per line
-    // Create a Set for O(1) lookup
-    const words = new Set<string>(
-      fileContent
-        .split("\n")
-        .map(w => w.trim())
-        .filter(w => w.length === 5)
-    );
+    // The file contains accented 5-letter words
+    // We normalize them to standard uppercase (A-Z) for the validation Set
+    const words = new Set<string>();
+    const lines = fileContent.split("\n");
+    
+    for (const line of lines) {
+      const word = line.trim();
+      if (word && word.length === 5) {
+         const normalized = word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+         words.add(normalized);
+      }
+    }
 
     dictionaryWords = words;
     global.__dictionaryCacheSet = words; // Store in global cache
     const loadTime = Date.now() - startTime;
-    console.log(`✓ Loaded ${words.size} words from dictionary in ${loadTime}ms`);
-    
-    // Debug: check if "DANSE" is in the set (common test word)
-    if (words.has("DANSE")) {
-      console.log("✓ 'DANSE' found in dictionary");
-    }
+    console.log(`✓ Loaded ${words.size} unique normalized words from dictionary in ${loadTime}ms`);
     
     return words;
   } catch (error: any) {
@@ -102,7 +101,7 @@ export async function validateWord(word: string): Promise<boolean> {
     return false;
   }
   
-  // Reject words with accents - only allow A-Z letters (no accents, no special chars)
+  // Reject words with accents - guesses should be strictly A-Z
   const noAccentsPattern = /^[A-Z]+$/i;
   if (!noAccentsPattern.test(word)) {
     return false;
@@ -113,9 +112,8 @@ export async function validateWord(word: string): Promise<boolean> {
   // Load dictionary and check if word exists
   const dictionary = loadDictionary();
   
-  // Debug logging
   if (dictionary.size === 0) {
-    console.error(`⚠ Dictionary is empty! Cannot validate "${upperWord}". Error: ${dictionaryLoadError || "Unknown"}`);
+    console.error(`⚠ Dictionary is empty! Cannot validate "${upperWord}".`);
   }
   
   if (dictionary.has(upperWord)) {
@@ -134,7 +132,5 @@ export async function validateWord(word: string): Promise<boolean> {
     return true;
   }
   
-  // Word not found in dictionary
-  console.log(`✗ Word "${upperWord}" not found in dictionary (dict size: ${dictionary.size})`);
   return false;
 }
