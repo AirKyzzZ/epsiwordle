@@ -1,0 +1,99 @@
+import clsx from "clsx";
+import { GameStatus, GuessResult } from "@/hooks/use-wordle";
+import { WORD_LENGTH, MAX_CHALLENGES, LetterStatus } from "@/lib/wordle/wordle-logic";
+
+interface WordleBoardProps {
+  guesses: GuessResult[];
+  currentGuess: string;
+  gameStatus: GameStatus;
+  shakeRow: boolean;
+}
+
+export function WordleBoard({ guesses, currentGuess, gameStatus, shakeRow }: WordleBoardProps) {
+  const empties = Array.from({ length: MAX_CHALLENGES - 1 - guesses.length }).fill("");
+
+  return (
+    <div className="mb-6 grid grid-rows-6 gap-2">
+      {guesses.map((guess, i) => (
+        <CompletedRow key={i} guess={guess} />
+      ))}
+      {guesses.length < MAX_CHALLENGES && (
+        <CurrentRow guess={currentGuess} shake={shakeRow} />
+      )}
+      {empties.map((_, i) => (
+        <EmptyRow key={i} />
+      ))}
+    </div>
+  );
+}
+
+function CompletedRow({ guess }: { guess: GuessResult }) {
+  return (
+    <div className="grid grid-cols-5 gap-2">
+      {guess.word.split("").map((letter, i) => (
+        <Cell key={i} letter={letter} status={guess.statuses[i]} />
+      ))}
+    </div>
+  );
+}
+
+function CurrentRow({ guess, shake }: { guess: string; shake: boolean }) {
+  const splitGuess = guess.split("");
+  const emptyCells = Array.from({ length: WORD_LENGTH - splitGuess.length }).fill("");
+
+  return (
+    <div className={clsx("grid grid-cols-5 gap-2", shake && "animate-shake")}>
+      {splitGuess.map((letter, i) => (
+        <Cell key={i} letter={letter} status="empty" isCompleted={false} />
+      ))}
+      {emptyCells.map((_, i) => (
+        <Cell key={i} />
+      ))}
+    </div>
+  );
+}
+
+function EmptyRow() {
+  return (
+    <div className="grid grid-cols-5 gap-2">
+      {Array.from({ length: WORD_LENGTH }).fill("").map((_, i) => (
+        <Cell key={i} />
+      ))}
+    </div>
+  );
+}
+
+function Cell({
+  letter,
+  status = "empty",
+  isCompleted = true,
+}: {
+  letter?: string;
+  status?: LetterStatus;
+  isCompleted?: boolean;
+}) {
+  const baseClasses =
+    "flex h-14 w-14 items-center justify-center text-3xl font-bold uppercase border-2 select-none";
+  
+  const statusClasses = {
+    correct: "bg-[#6aaa64] border-[#6aaa64] text-white",
+    present: "bg-[#c9b458] border-[#c9b458] text-white",
+    absent: "bg-[#787c7e] border-[#787c7e] text-white",
+    empty: clsx(
+      "bg-transparent",
+      letter && !isCompleted ? "border-black dark:border-gray-400 animate-pop" : "border-gray-300 dark:border-gray-600"
+    ),
+  };
+
+  return (
+    <div
+      className={clsx(
+        baseClasses,
+        statusClasses[status]
+      )}
+    >
+      {letter}
+    </div>
+  );
+}
+
