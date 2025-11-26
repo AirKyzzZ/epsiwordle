@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
+import { getSiteUrl } from "@/lib/utils/site-url";
 
 export async function login(formData: FormData) {
   const email = formData.get("email") as string;
@@ -36,7 +37,7 @@ export async function signup(formData: FormData) {
     return { error: "Veuillez utiliser votre adresse email EPSI (@ecoles-epsi.net)" };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "";
+  const siteUrl = await getSiteUrl();
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -64,7 +65,7 @@ export async function signInWithMagicLink(formData: FormData) {
     return { error: "Veuillez utiliser votre adresse email EPSI (@ecoles-epsi.net)" };
   }
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "";
+  const siteUrl = await getSiteUrl();
   const { error } = await supabase.auth.signInWithOtp({
     email,
     options: {
