@@ -34,7 +34,8 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
 
   const [isSaving, setIsSaving] = useState(false);
   const [saved, setSaved] = useState(!!initialGameState);
-  const [isValidating, setIsValidating] = useState(false);
+  // Removed visual loading state for validation to make it feel instant
+  // const [isValidating, setIsValidating] = useState(false); 
 
   const handleEnter = async () => {
     if (gameStatus !== "playing") return;
@@ -44,19 +45,19 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
       return;
     }
 
-    setIsValidating(true);
+    // Optimistic UI: don't show loading, just wait
+    // setIsValidating(true); 
     try {
       const isValid = await validateWord(currentGuess);
       if (!isValid) {
         setErrorMessage("Ce mot n'est pas dans notre dictionnaire");
-        // Need to manually trigger shake if possible or just show error
         return;
       }
       onEnter();
     } catch (e) {
       console.error("Validation error", e);
     } finally {
-      setIsValidating(false);
+      // setIsValidating(false);
     }
   };
 
@@ -160,11 +161,7 @@ export function WordleGame({ word, wordId, definition, initialGameState }: Wordl
         </div>
       )}
       
-      {isValidating && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-           <Loader2 className="h-8 w-8 animate-spin text-white" />
-        </div>
-      )}
+      {/* Removed loading overlay */}
     </div>
   );
 }
