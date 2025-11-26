@@ -11,9 +11,7 @@ export default function Home() {
         <div className="mb-8 relative">
           <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg blur opacity-75 animate-pulse"></div>
           <div className="relative px-8 py-4 bg-black rounded-lg leading-none flex items-center">
-            <span className="text-6xl font-bold tracking-tighter">
-              <span className="text-emerald-500">EPSI</span>WORDLE
-            </span>
+            <img src="/logo.png" alt="EPSIWORDLE" className="h-24 w-auto" />
           </div>
         </div>
 

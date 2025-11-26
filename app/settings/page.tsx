@@ -30,7 +30,7 @@ export default function SettingsPage() {
           <h2 className="text-lg font-medium mb-4">À propos</h2>
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             EPSIWordle v1.0.0<br />
-            Fait avec ❤️ pour les étudiants de l'EPSI.
+            Fait avec ❤️ pour les étudiants de l'EPSI par Maxime MANSIET (B2 Bordeaux).
           </p>
         </div>
       </div>

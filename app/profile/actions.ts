@@ -50,45 +50,61 @@ export async function updateProfile(formData: FormData) {
 }
 
 export async function uploadAvatar(formData: FormData) {
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    throw new Error("Unauthorized");
+    if (!user) {
+      return { error: "Non autorisé" };
+    }
+
+    const file = formData.get("avatar") as File;
+    if (!file) {
+      return { error: "Aucun fichier sélectionné" };
+    }
+
+    // Check file size (1 MB = 1,048,576 bytes)
+    const MAX_SIZE = 1 * 1024 * 1024; // 1 MB
+    if (file.size > MAX_SIZE) {
+      return { error: "L'image est trop volumineuse. Taille maximale : 1 Mo." };
+    }
+
+    // Upload file to Supabase Storage
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      return { error: uploadError.message };
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('avatars')
+      .getPublicUrl(fileName);
+
+    // Update profile
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: publicUrl })
+      .eq("id", user.id);
+
+    if (updateError) {
+      return { error: updateError.message };
+    }
+
+    revalidatePath("/profile");
+    return { success: "Avatar mis à jour", avatarUrl: publicUrl };
+  } catch (error: any) {
+    // Catch Next.js body size limit error
+    if (error?.message?.includes("Body exceeded") || error?.message?.includes("1 MB")) {
+      return { error: "L'image est trop volumineuse. Taille maximale : 1 Mo. Veuillez compresser ou réduire la taille de votre image." };
+    }
+    
+    // Generic error
+    console.error("Avatar upload error:", error);
+    return { error: "Une erreur est survenue lors du téléchargement de l'image. Veuillez réessayer." };
   }
-
-  const file = formData.get("avatar") as File;
-  if (!file) {
-    return { error: "Aucun fichier sélectionné" };
-  }
-
-  // Upload file to Supabase Storage
-  const fileExt = file.name.split('.').pop();
-  const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-  const { error: uploadError } = await supabase.storage
-    .from('avatars')
-    .upload(fileName, file);
-
-  if (uploadError) {
-    return { error: uploadError.message };
-  }
-
-  // Get public URL
-  const { data: { publicUrl } } = supabase.storage
-    .from('avatars')
-    .getPublicUrl(fileName);
-
-  // Update profile
-  const { error: updateError } = await supabase
-    .from("profiles")
-    .update({ avatar_url: publicUrl })
-    .eq("id", user.id);
-
-  if (updateError) {
-    return { error: updateError.message };
-  }
-
-  revalidatePath("/profile");
-  return { success: "Avatar mis à jour", avatarUrl: publicUrl };
 }
-
