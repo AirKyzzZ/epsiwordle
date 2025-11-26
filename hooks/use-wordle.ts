@@ -8,12 +8,6 @@ export type GuessResult = {
   statuses: LetterStatus[];
 };
 
-// Helper to validate French words using a public API or local list
-// Using a free API like dictionaryapi.dev (limited for French) or a large local list is better.
-// For simplicity and performance, a local list is often preferred, or a server action.
-// Let's assume we will add a server action validation or just a check against a known dictionary.
-// For now, we'll allow any word for testing unless we implement the dictionary check.
-
 export function useWordle(solution: string) {
   const [currentGuess, setCurrentGuess] = useState("");
   const [guesses, setGuesses] = useState<GuessResult[]>([]);
@@ -22,6 +16,11 @@ export function useWordle(solution: string) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const wordLength = solution.length;
+
+  const triggerShake = useCallback(() => {
+    setShakeRow(true);
+    setTimeout(() => setShakeRow(false), 600);
+  }, []);
 
   const onChar = useCallback((char: string) => {
     if (gameStatus !== "playing" || currentGuess.length >= wordLength) return;
@@ -39,20 +38,9 @@ export function useWordle(solution: string) {
     if (gameStatus !== "playing") return;
 
     if (currentGuess.length !== wordLength) {
-      setShakeRow(true);
-      setErrorMessage(`Le mot doit faire ${wordLength} lettres`);
-      setTimeout(() => setShakeRow(false), 600);
+      triggerShake();
       return;
     }
-
-    // Validation logic would go here.
-    // const isValid = await validateWord(currentGuess);
-    // if (!isValid) { 
-    //   setShakeRow(true); 
-    //   setErrorMessage("Ce mot n'est pas dans le dictionnaire"); 
-    //   setTimeout(() => setShakeRow(false), 600);
-    //   return; 
-    // }
 
     const statuses = getGuessStatuses(solution, currentGuess);
     const newGuessResult = { word: currentGuess, statuses };
@@ -66,7 +54,7 @@ export function useWordle(solution: string) {
     } else if (newGuesses.length >= MAX_CHALLENGES) {
       setGameStatus("lost");
     }
-  }, [gameStatus, currentGuess, guesses, solution, wordLength]);
+  }, [gameStatus, currentGuess, guesses, solution, wordLength, triggerShake]);
 
   return {
     currentGuess,
@@ -78,6 +66,7 @@ export function useWordle(solution: string) {
     onChar,
     onDelete,
     onEnter,
-    setErrorMessage, // Exposing this if external validation needs to set it
+    triggerShake,
+    setErrorMessage,
   };
 }
