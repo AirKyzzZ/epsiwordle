@@ -73,8 +73,8 @@ export function WordleKeyboard({ onChar, onDelete, onEnter, guesses }: WordleKey
                   "flex h-14 flex-1 items-center justify-center rounded text-sm font-bold uppercase transition-colors",
                   status === "correct" && "bg-[#6aaa64] text-white",
                   status === "present" && "bg-[#c9b458] text-white",
-                  status === "absent" && "bg-[#787c7e] text-white",
-                  !status && "bg-gray-200 text-black hover:bg-gray-300 dark:bg-gray-600 dark:text-white"
+                  status === "absent" && "bg-transparent text-black dark:text-white border border-gray-300 dark:border-gray-600",
+                  !status && "bg-[#787c7e] text-white"
                 )}
               >
                 {char}
