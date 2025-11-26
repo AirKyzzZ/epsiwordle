@@ -10,11 +10,25 @@ export interface DailyWord {
   date: string;
 }
 
+// Global cache for dictionary words (persists across module reloads in production)
+// Using a WeakMap-like pattern but with a simple global variable
+declare global {
+  // eslint-disable-next-line no-var
+  var __dictionaryCache: string[] | undefined;
+}
+
 // Cache for dictionary words
 let dictionaryWords: string[] | null = null;
 
 function loadDictionary(): string[] {
+  // Check module-level cache first
   if (dictionaryWords) {
+    return dictionaryWords;
+  }
+
+  // Check global cache (survives hot reloads in dev, persists in production)
+  if (global.__dictionaryCache) {
+    dictionaryWords = global.__dictionaryCache;
     return dictionaryWords;
   }
 
@@ -27,8 +41,10 @@ function loadDictionary(): string[] {
     }
 
     console.log(`Loading dictionary from: ${filePath}`);
+    const startTime = Date.now();
     const fileContent = readFileSync(filePath, "utf-8");
     const words: string[] = [];
+    const wordsSet = new Set<string>(); // Use Set for O(1) duplicate checking
 
     // Parse the .dic file format
     const lines = fileContent.split("\n");
@@ -57,17 +73,20 @@ function loadDictionary(): string[] {
       // Remove accents and convert to uppercase for comparison
       const normalizedWord = word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
       
-      // Only add if it's a valid word (letters only, no special chars after normalization)
-      if (/^[A-Z]+$/.test(normalizedWord) && normalizedWord.length >= 4 && normalizedWord.length <= 10) {
-        // Avoid duplicates
-        if (!words.includes(normalizedWord)) {
+      // Only add if it's a valid 5-letter word (letters only, no special chars after normalization)
+      if (/^[A-Z]+$/.test(normalizedWord) && normalizedWord.length === 5) {
+        // Use Set for O(1) duplicate checking instead of array.includes()
+        if (!wordsSet.has(normalizedWord)) {
+          wordsSet.add(normalizedWord);
           words.push(normalizedWord);
         }
       }
     }
 
     dictionaryWords = words;
-    console.log(`✓ Loaded ${words.length} words from dictionary`);
+    global.__dictionaryCache = words; // Store in global cache
+    const loadTime = Date.now() - startTime;
+    console.log(`✓ Loaded ${words.length} words from dictionary in ${loadTime}ms`);
     return words;
   } catch (error: any) {
     console.error("Error loading dictionary:", error.message);

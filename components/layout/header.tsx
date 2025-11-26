@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { User, Settings, BarChart3 } from "lucide-react";
 import { usePathname } from "next/navigation";
 
@@ -20,7 +21,14 @@ export function Header() {
       
       <div className="flex w-1/3 justify-center">
         <Link href="/game" className="flex items-center justify-center">
-          <img src="logo.png" alt="EPSIWORDLE" className="h-10 w-auto" />
+          <Image 
+            src="/logo.png" 
+            alt="EPSIWORDLE" 
+            width={120}
+            height={40}
+            className="h-10 w-auto"
+            priority
+          />
         </Link>
       </div>
 

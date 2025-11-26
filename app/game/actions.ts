@@ -6,17 +6,33 @@ import { revalidatePath } from "next/cache";
 import { readFileSync, existsSync } from "fs";
 import { join } from "path";
 
+// Global cache for dictionary words (persists across module reloads)
+declare global {
+  // eslint-disable-next-line no-var
+  var __dictionaryCacheSet: Set<string> | undefined;
+  // eslint-disable-next-line no-var
+  var __dictionaryLoadError: string | undefined;
+}
+
 // Cache for dictionary words
 let dictionaryWords: Set<string> | null = null;
 let dictionaryLoadError: string | null = null;
 
 function loadDictionary(): Set<string> {
+  // Check module-level cache first
   if (dictionaryWords) {
     return dictionaryWords;
   }
 
-  if (dictionaryLoadError) {
-    console.error("Dictionary already failed to load:", dictionaryLoadError);
+  // Check global cache (survives hot reloads in dev, persists in production)
+  if (global.__dictionaryCacheSet) {
+    dictionaryWords = global.__dictionaryCacheSet;
+    return dictionaryWords;
+  }
+
+  if (dictionaryLoadError || global.__dictionaryLoadError) {
+    const error = dictionaryLoadError || global.__dictionaryLoadError;
+    console.error("Dictionary already failed to load:", error);
     return new Set<string>();
   }
 
@@ -25,11 +41,13 @@ function loadDictionary(): Set<string> {
     
     if (!existsSync(filePath)) {
       dictionaryLoadError = `File not found at: ${filePath}`;
+      global.__dictionaryLoadError = dictionaryLoadError;
       console.error(dictionaryLoadError);
       return new Set<string>();
     }
 
     console.log(`Loading dictionary from: ${filePath}`);
+    const startTime = Date.now();
     const fileContent = readFileSync(filePath, "utf-8");
     const words = new Set<string>();
 
@@ -62,14 +80,16 @@ function loadDictionary(): Set<string> {
       // Remove accents and convert to uppercase for comparison
       const normalizedWord = word.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
       
-      // Only add if it's a valid word (letters only, no special chars after normalization)
-      if (/^[A-Z]+$/.test(normalizedWord)) {
+      // Only add if it's a valid 5-letter word (letters only, no special chars after normalization)
+      if (/^[A-Z]+$/.test(normalizedWord) && normalizedWord.length === 5) {
         words.add(normalizedWord);
       }
     }
 
     dictionaryWords = words;
-    console.log(`✓ Loaded ${words.size} words from dictionary (processed ${processedCount} lines)`);
+    global.__dictionaryCacheSet = words; // Store in global cache
+    const loadTime = Date.now() - startTime;
+    console.log(`✓ Loaded ${words.size} words from dictionary in ${loadTime}ms (processed ${processedCount} lines)`);
     
     // Debug: check if "danse" is in the set
     if (words.has("DANSE")) {
@@ -84,6 +104,7 @@ function loadDictionary(): Set<string> {
     return words;
   } catch (error: any) {
     dictionaryLoadError = error.message;
+    global.__dictionaryLoadError = error.message;
     console.error("Error loading dictionary:", error.message);
     console.error("Stack:", error.stack);
     return new Set<string>();
@@ -109,7 +130,7 @@ export async function saveGame(wordId: string, attempts: number, guesses: any[])
 }
 
 export async function validateWord(word: string): Promise<boolean> {
-  if (!word || word.length < 2) {
+  if (!word || word.length !== 5) {
     return false;
   }
   
