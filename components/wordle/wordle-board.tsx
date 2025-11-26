@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { GameStatus, GuessResult } from "@/hooks/use-wordle";
 import { MAX_CHALLENGES, LetterStatus } from "@/lib/wordle/wordle-logic";
+import { useEffect, useRef } from "react";
 
 interface WordleBoardProps {
   guesses: GuessResult[];
@@ -12,11 +13,21 @@ interface WordleBoardProps {
 
 export function WordleBoard({ guesses, currentGuess, gameStatus, shakeRow, wordLength }: WordleBoardProps) {
   const empties = Array.from({ length: MAX_CHALLENGES - 1 - guesses.length }).fill("");
+  const prevGuessesLength = useRef(guesses.length);
+
+  useEffect(() => {
+    prevGuessesLength.current = guesses.length;
+  }, [guesses.length]);
 
   return (
     <div className="mb-6 grid grid-rows-6 gap-2">
       {guesses.map((guess, i) => (
-        <CompletedRow key={i} guess={guess} wordLength={wordLength} />
+        <CompletedRow 
+          key={i} 
+          guess={guess} 
+          wordLength={wordLength} 
+          isRevealing={i >= prevGuessesLength.current}
+        />
       ))}
       {guesses.length < MAX_CHALLENGES && (
         <CurrentRow guess={currentGuess} shake={shakeRow} wordLength={wordLength} />
@@ -28,11 +39,25 @@ export function WordleBoard({ guesses, currentGuess, gameStatus, shakeRow, wordL
   );
 }
 
-function CompletedRow({ guess, wordLength }: { guess: GuessResult; wordLength: number }) {
+function CompletedRow({ 
+  guess, 
+  wordLength, 
+  isRevealing 
+}: { 
+  guess: GuessResult; 
+  wordLength: number; 
+  isRevealing: boolean; 
+}) {
   return (
     <div className="flex gap-2 justify-center">
       {guess.word.split("").map((letter, i) => (
-        <Cell key={i} letter={letter} status={guess.statuses[i]} />
+        <Cell 
+          key={i} 
+          letter={letter} 
+          status={guess.statuses[i]} 
+          isRevealing={isRevealing}
+          revealDelay={i * 300} // 300ms stagger
+        />
       ))}
     </div>
   );
@@ -68,10 +93,14 @@ function Cell({
   letter,
   status = "empty",
   isCompleted = true,
+  isRevealing = false,
+  revealDelay = 0,
 }: {
   letter?: string;
   status?: LetterStatus;
   isCompleted?: boolean;
+  isRevealing?: boolean;
+  revealDelay?: number;
 }) {
   const baseClasses =
     "flex h-14 w-14 items-center justify-center text-3xl font-bold uppercase border-2 select-none";
@@ -86,12 +115,27 @@ function Cell({
     ),
   };
 
+  const revealColors = {
+    correct: "#6aaa64",
+    present: "#c9b458",
+    absent: "#787c7e",
+    empty: "transparent"
+  };
+
+  const style = isRevealing && status !== 'empty' ? {
+    '--reveal-bg': revealColors[status as keyof typeof revealColors],
+    '--reveal-border': revealColors[status as keyof typeof revealColors],
+    animationDelay: `${revealDelay}ms`
+  } as React.CSSProperties : {};
+
   return (
     <div
       className={clsx(
         baseClasses,
-        statusClasses[status]
+        !isRevealing && statusClasses[status],
+        isRevealing && "animate-reveal"
       )}
+      style={style}
     >
       {letter}
     </div>
